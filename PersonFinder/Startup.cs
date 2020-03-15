@@ -24,6 +24,33 @@ namespace PersonFinder
 		{
 			services.AddControllers();
 
+			ApplyAuth(services);
+		}
+
+		// This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+		public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+		{
+			if (env.IsDevelopment())
+			{
+				app.UseDeveloperExceptionPage();
+			}
+
+			ApplySecureHeaders(app);
+
+			app.UseHttpsRedirection();
+
+			app.UseRouting();
+
+			app.UseAuthorization();
+
+			app.UseEndpoints(endpoints =>
+			{
+				endpoints.MapControllers();
+			});
+		}
+
+		private void ApplyAuth(IServiceCollection services)
+		{
 			services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 				.AddJwtBearer(options =>
 				{
@@ -41,24 +68,23 @@ namespace PersonFinder
 			});
 		}
 
-		// This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-		public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+		private static void ApplySecureHeaders(IApplicationBuilder app)
 		{
-			if (env.IsDevelopment())
-			{
-				app.UseDeveloperExceptionPage();
-			}
+			var policies = new HeaderPolicyCollection()
+				.AddFrameOptionsDeny()
+				.AddXssProtectionBlock()
+				.AddContentTypeOptionsNoSniff()
+				.AddStrictTransportSecurityMaxAgeIncludeSubDomains(maxAgeInSeconds: 60 * 60 * 24 * 365) // maxage = one year in seconds
+				.AddReferrerPolicyStrictOriginWhenCrossOrigin()
+				.RemoveServerHeader()
+				.AddContentSecurityPolicy(builder =>
+				{
+					builder.AddObjectSrc().None();
+					builder.AddFormAction().Self();
+					builder.AddFrameAncestors().None();
+				});
 
-			app.UseHttpsRedirection();
-
-			app.UseRouting();
-
-			app.UseAuthorization();
-
-			app.UseEndpoints(endpoints =>
-			{
-				endpoints.MapControllers();
-			});
+			app.UseSecurityHeaders(policies);
 		}
 	}
 }
