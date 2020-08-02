@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using PersonFinder.Middleware;
+using Microsoft.Identity.Web;
 
 namespace PersonFinder
 {
@@ -22,9 +22,27 @@ namespace PersonFinder
 		// This method gets called by the runtime. Use this method to add services to the container.
 		public void ConfigureServices(IServiceCollection services)
 		{
-			services.AddControllers();
+			// Adds Microsoft Identity platform (AAD v2.0) support to protect this Api
+			services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+				.AddMicrosoftWebApi(options =>
+					{
+						Configuration.Bind("AzureAdB2C", options);
 
-			ApplyAuth(services);
+						options.TokenValidationParameters.NameClaimType = "name";
+					},
+					options => { Configuration.Bind("AzureAdB2C", options); });
+
+			services.AddControllers();
+			services.AddAuthorization();
+
+			// Require auth on all routes.
+			services.AddMvc(options =>
+			{
+				var policy = new AuthorizationPolicyBuilder()
+					.RequireAuthenticatedUser()
+					.Build();
+				options.Filters.Add(new AuthorizeFilter(policy));
+			});
 		}
 
 		// This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -40,31 +58,12 @@ namespace PersonFinder
 			app.UseHttpsRedirection();
 
 			app.UseRouting();
-
+			app.UseAuthentication();
 			app.UseAuthorization();
 
 			app.UseEndpoints(endpoints =>
 			{
 				endpoints.MapControllers();
-			});
-		}
-
-		private void ApplyAuth(IServiceCollection services)
-		{
-			services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-				.AddJwtBearer(options =>
-				{
-					var authConfiguration = Configuration.GetSection("Auth").Get<AuthConfiguration>();
-					options.UseGoogle(authConfiguration.Google.ClientId);
-				});
-
-			// Require auth on all routes.
-			services.AddMvc(options =>
-			{
-				var policy = new AuthorizationPolicyBuilder()
-					.RequireAuthenticatedUser()
-					.Build();
-				options.Filters.Add(new AuthorizeFilter(policy));
 			});
 		}
 

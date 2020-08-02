@@ -7,7 +7,7 @@ using PersonFinder.Models;
 namespace PersonFinder.Controllers
 {
 	[ApiController]
-	[Route("[controller]")]
+	[Route("api/[controller]")]
 	public class PeopleController : ControllerBase
 	{
 		private readonly ILogger<PeopleController> _logger;
